@@ -151,51 +151,25 @@ if uploaded_zip:
         st.write("✅ Cleaned & Merged Data Preview:")
         st.dataframe(merged.head())
 
-        # Upload to Google Sheets with progress
+        # Upload to Google Sheets
         try:
-            SHEET_ID = "1PLpxXH1cE6Xe6BefvfaeO6eN0SwpHwuH0KY-Kocp-l4"
-            sheet = connect_gsheet(SHEET_ID, worksheet_index=0)
-            sheet.clear()
-
-            # Convert DataFrame → list of lists (headers + rows)
-            # Use original CSV header names if available in attrs from any part DF
-            # Prefer the mapping from the first non-empty frame used in the merge
-            header_mapping = {}
-            for df_part in all_data:
-                if isinstance(getattr(df_part, "attrs", None), dict) and df_part.attrs.get("letter_to_header"):
-                    header_mapping = df_part.attrs["letter_to_header"]
-                    break
-            header_row = [header_mapping.get(col, col) for col in merged.columns.tolist()]
-            values = [header_row] + merged.values.tolist()
-
-            # Prepare upload progress UI
-            upload_progress = st.progress(0)
-            upload_percent_text = st.empty()
             with st.spinner("Uploading to Google Sheets..."):
-                # Write header first
-                num_cols = len(header_row)
-                last_col_letter = index_to_col_letter(num_cols - 1)
-                header_range = f"A1:{last_col_letter}1"
-                sheet.update(header_range, [header_row])
+                SHEET_ID = "1PLpxXH1cE6Xe6BefvfaeO6eN0SwpHwuH0KY-Kocp-l4"
+                sheet = connect_gsheet(SHEET_ID, worksheet_index=0)
+                sheet.clear()
 
-                # Chunk data rows to show progress
-                data_rows = values[1:]
-                total_rows = len(data_rows)
-                if total_rows == 0:
-                    upload_progress.progress(100)
-                    upload_percent_text.write("100% uploaded")
-                else:
-                    chunk_size = 1000
-                    for start in range(0, total_rows, chunk_size):
-                        end = min(start + chunk_size, total_rows)
-                        chunk = data_rows[start:end]
-                        start_row_number = 2 + start
-                        end_row_number = 2 + end - 1
-                        data_range = f"A{start_row_number}:{last_col_letter}{end_row_number}"
-                        sheet.update(data_range, chunk)
-                        progress = int(((end) / total_rows) * 100)
-                        upload_progress.progress(progress)
-                        upload_percent_text.write(f"{progress}% uploaded")
+                # Convert DataFrame → list of lists (headers + rows)
+                # Use original CSV header names if available in attrs from any part DF
+                # Prefer the mapping from the first non-empty frame used in the merge
+                header_mapping = {}
+                for df_part in all_data:
+                    if isinstance(getattr(df_part, "attrs", None), dict) and df_part.attrs.get("letter_to_header"):
+                        header_mapping = df_part.attrs["letter_to_header"]
+                        break
+                header_row = [header_mapping.get(col, col) for col in merged.columns.tolist()]
+                values = [header_row] + merged.values.tolist()
+
+                sheet.update(values)
             st.success("🎉 Data uploaded to Google Sheets successfully!")
         except Exception as e:
             st.error(f"Failed to upload to Google Sheets: {e}")
