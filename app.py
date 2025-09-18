@@ -3,6 +3,7 @@ import zipfile, os, datetime
 import pandas as pd
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
+import json, os
 
 # ========= HELPERS =========
 def col_letter_to_index(letter: str) -> int:
@@ -39,10 +40,36 @@ _needed_idxs = [
 ] + [col_letter_to_index(end) for (_, end) in DROP_RANGES_LETTERS]
 MAX_NEEDED_IDX = max(_needed_idxs)
 
+def _load_service_account_credentials(scope):
+    """Load service account credentials from Streamlit secrets, env var, or local file."""
+    # 1) Streamlit secrets: st.secrets["gcp_service_account"] (dict or JSON string)
+    try:
+        if hasattr(st, "secrets") and "gcp_service_account" in st.secrets:
+            secret_val = st.secrets["gcp_service_account"]
+            if isinstance(secret_val, str):
+                data = json.loads(secret_val)
+            else:
+                data = dict(secret_val)
+            return ServiceAccountCredentials.from_json_keyfile_dict(data, scope)
+    except Exception:
+        pass
+
+    # 2) Environment variable: GOOGLE_SERVICE_ACCOUNT_JSON (JSON string)
+    env_json = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON")
+    if env_json:
+        try:
+            data = json.loads(env_json)
+            return ServiceAccountCredentials.from_json_keyfile_dict(data, scope)
+        except Exception:
+            pass
+
+    # 3) Fallback local file
+    return ServiceAccountCredentials.from_json_keyfile_name("service_account.json", scope)
+
 # # ========= GOOGLE SHEETS SETUP =========
 def connect_gsheet(sheet_id: str, worksheet_index: int = 0):
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    creds = ServiceAccountCredentials.from_json_keyfile_name("service_account.json", scope)
+    creds = _load_service_account_credentials(scope)
     client = gspread.authorize(creds)
     sh = client.open_by_key(sheet_id)
     return sh.get_worksheet(worksheet_index)  # default: first sheet
