@@ -41,21 +41,31 @@ _needed_idxs = [
 MAX_NEEDED_IDX = max(_needed_idxs)
 
 def _load_service_account_credentials(scope):
-    """Load service account credentials from Streamlit secrets, env var, or local file."""
-    # 1) Streamlit secrets: st.secrets["gcp_service_account"] (dict or JSON string)
+    """Load service account credentials from Streamlit secrets, env var, or local file.
+
+    Priority order:
+      1) st.secrets["GCP_SERVICE_ACCOUNT"] or st.secrets["gcp_service_account"]
+      2) Environment var GOOGLE_SERVICE_ACCOUNT_JSON (JSON string)
+      3) Local file service_account.json (only for local dev)
+    """
+    # 1) Streamlit secrets (both uppercase and lowercase keys supported)
     try:
-        if hasattr(st, "secrets") and "gcp_service_account" in st.secrets:
-            secret_val = st.secrets["gcp_service_account"]
-            if isinstance(secret_val, str):
-                data = json.loads(secret_val)
-            else:
-                data = dict(secret_val)
-            return ServiceAccountCredentials.from_json_keyfile_dict(data, scope)
+        if hasattr(st, "secrets"):
+            for key in ("GCP_SERVICE_ACCOUNT", "gcp_service_account"):
+                if key in st.secrets:
+                    secret_val = st.secrets[key]
+                    if isinstance(secret_val, str):
+                        data = json.loads(secret_val)
+                    else:
+                        data = dict(secret_val)
+                    # For oauth2client.ServiceAccountCredentials we can use the dict directly
+                    return ServiceAccountCredentials.from_json_keyfile_dict(data, scope)
     except Exception:
+        # fall through to other options
         pass
 
     # 2) Environment variable: GOOGLE_SERVICE_ACCOUNT_JSON (JSON string)
-    env_json = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON")
+    env_json = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON") or os.environ.get("GOOGLE_APPLICATION_CREDENTIALS_JSON")
     if env_json:
         try:
             data = json.loads(env_json)
@@ -63,7 +73,7 @@ def _load_service_account_credentials(scope):
         except Exception:
             pass
 
-    # 3) Fallback local file
+    # 3) Fallback to local file (service_account.json) for development only
     return ServiceAccountCredentials.from_json_keyfile_name("service_account.json", scope)
 
 # # ========= GOOGLE SHEETS SETUP =========

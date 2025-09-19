@@ -8,6 +8,7 @@ import os
 import datetime
 import pandas as pd
 import json
+import os
 
 # ========= HELPERS =========
 def col_letter_to_index(letter: str) -> int:
@@ -188,4 +189,14 @@ def main():
         print("❌ No data was processed successfully")
 
 if __name__ == "__main__":
+    # If GOOGLE_SERVICE_ACCOUNT_JSON is set for local runs, write it to service_account.json
+    gcp_json = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON")
+    if gcp_json:
+        try:
+            with open("service_account.json", "w") as f:
+                # if the env var is already JSON text, write as-is; if it's a dict-like str, write it
+                f.write(gcp_json)
+            print("(Local) Wrote service_account.json from env var for local testing")
+        except Exception as e:
+            print(f"Failed to write local service_account.json from env: {e}")
     main()
